@@ -6,12 +6,8 @@ venv/
 
 # 로컬 설정·생성물 (커밋 금지)
 .mockdeck_config.json
-output.pptx
-mockdeck.pptx
-test_output.pptx
-*_filltest.pptx
-email_test.pptx
-reg*.pptx
+*.pptx
+!template/template.pptx
 ~$*.pptx
 viz_preview.html
 streamlit_boot.log

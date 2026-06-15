@@ -36,5 +36,6 @@ echo.
 echo [실행] Mock-deck Generator 시작 — 잠시 후 브라우저가 자동으로 열립니다.
 echo   (종료하려면 이 검은 창에서 Ctrl+C 를 누르거나 창을 닫으세요.)
 echo.
-".venv\Scripts\python.exe" -m streamlit run app.py
+REM echo. 로 첫 실행 시 나오는 이메일 입력 프롬프트를 빈 값으로 건너뜀
+echo. | ".venv\Scripts\python.exe" -m streamlit run app.py
 pause

@@ -20,4 +20,5 @@ if [ ! -f ".venv/deps.ok" ]; then
 fi
 
 echo "[실행] Mock-deck Generator 시작 — 브라우저가 자동으로 열립니다."
-./.venv/bin/python -m streamlit run app.py
+# echo "" 로 첫 실행 시 이메일 입력 프롬프트를 빈 값으로 건너뜀
+echo "" | ./.venv/bin/python -m streamlit run app.py

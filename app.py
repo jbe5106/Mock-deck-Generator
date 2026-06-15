@@ -21,12 +21,22 @@ import emailer as EM
 
 st.set_page_config(page_title="Mock-deck Generator", page_icon="📊", layout="wide")
 
-# 사용자가 직접 입력하는 칸(text input·text area)의 글자를 볼드 + 살짝 크게
+# 입력칸 글자(볼드+살짝 크게) + 버튼(크게+볼드)
 st.markdown("""<style>
 .stTextInput input, [data-testid="stTextInput"] input,
 .stTextArea textarea, [data-testid="stTextArea"] textarea {
     font-weight: 700 !important;
     font-size: 1.05rem !important;
+}
+/* 버튼: 라벨 텍스트는 내부 <p>/<div>에 있어 그걸 직접 타겟해야 적용됨 */
+.stButton button, .stDownloadButton button {
+    padding: 0.65rem 1.2rem !important;
+    min-height: 3rem !important;
+}
+.stButton button p, .stButton button div,
+.stDownloadButton button p, .stDownloadButton button div {
+    font-size: 1.15rem !important;
+    font-weight: 800 !important;
 }
 </style>""", unsafe_allow_html=True)
 
@@ -337,12 +347,13 @@ if generated:
                     remove_item = None
                     for k, item in enumerate(sec["items"]):
                         with st.container(border=True):
-                            item["question"] = st.text_input(
+                            item["question"] = st.text_area(
                                 "질문 %d" % (k + 1), value=item["question"],
-                                key="q_%d_%d_%d" % (sid, j, k), placeholder="조사 필요 질문?")
+                                key="q_%d_%d_%d" % (sid, j, k), height=90,
+                                placeholder="조사 필요 질문?")
                             item["hypothesis"] = st.text_area(
                                 "⤷ 가설", value=item["hypothesis"],
-                                key="h_%d_%d_%d" % (sid, j, k), height=120,
+                                key="h_%d_%d_%d" % (sid, j, k), height=180,
                                 placeholder="이 질문에 대한 2~3문장 가설")
                             mc, dc = st.columns([4, 1])
                             item["method"] = mc.selectbox(
@@ -358,14 +369,14 @@ if generated:
                         sec["items"].append({"question": "", "method": CA.DEFAULT_METHOD, "hypothesis": ""})
                         st.rerun()
 
-                    st.markdown("**3. 도식 유형**")
+                    st.markdown("**3. 구조화 방향 제안**")
                     sec["viz_type"] = st.selectbox("도식 유형", CA.VIZ_TYPES,
                                                    index=_idx(CA.VIZ_TYPES, sec.get("viz_type")),
                                                    key="vt_%d_%d" % (sid, j), label_visibility="collapsed")
                     components.html(single_schematic_svg(sec["viz_type"]), height=104)
-                    sec["viz_note"] = st.text_input("도식 메모", value=sec.get("viz_note", ""),
-                                                    key="vn_%d_%d" % (sid, j),
-                                                    placeholder="어떻게 그릴지 한 줄 (강조·화살표 등)")
+                    sec["viz_note"] = st.text_area("구조화 방향 제안", value=sec.get("viz_note", ""),
+                                                   key="vn_%d_%d" % (sid, j), height=90,
+                                                   placeholder="어떻게 구조화할지 (강조·화살표·배치 등)")
 
             # 피드백 / 컨펌
             fb = st.text_input("✏️ 피드백 (마음에 안 들면 입력 후 재생성)", key="fb_%d" % sid,
@@ -398,7 +409,7 @@ confirmed = [s for s in generated if s["confirmed"]]
 if generated:
     st.divider()
     st.header("3단계: PPT로 생성")
-    st.caption("컨펌된 장표 %d / %d 장이 .pptx로 생성됩니다. (각 칸의 핵심 질문들이 본문 박스로 들어갑니다)"
+    st.caption("컨펌된 장표 %d / %d 장이 .pptx로 생성됩니다. (각 칸의 질문→KQ, 가설→Hypothesis, 구조화 방향→Structure 박스)"
                % (len(confirmed), len(generated)))
 
     if st.button("📦 PPT 생성", type="primary", disabled=not confirmed):

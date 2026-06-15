@@ -62,7 +62,7 @@ def generate_slide_content(
     model=DEFAULT_MODEL,
     feedback=None,
     prior=None,
-    max_tokens=2000,
+    max_tokens=8000,
 ):
     """한 장표에 대한 콘텐츠 초안 생성.
 
@@ -85,15 +85,27 @@ def generate_slide_content(
 
     messages = FEWSHOT + [{"role": "user", "content": user_msg}]
 
-    resp = client.messages.create(
-        model=model,
-        max_tokens=max_tokens,
-        system=SYSTEM_PROMPT,
-        messages=messages,
-    )
+    resp = _create_message(client, model, max_tokens, SYSTEM_PROMPT, messages)
+    # adaptive thinking 사용 시 thinking 블록이 섞이므로 text 블록만 취한다
     text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
     data = _parse_json(text)
     return _normalize(data)
+
+
+def _create_message(client, model, max_tokens, system, messages):
+    """Opus 확장 사고(adaptive thinking) + effort=high 로 깊이 있게 생성.
+    Opus 4.8은 thinking이 기본 OFF라, 켜야 길게 고민한 답이 나온다.
+    설치된 anthropic SDK가 해당 파라미터를 모르면(구버전) 자동으로 일반 호출로 폴백."""
+    base = dict(model=model, max_tokens=max_tokens, system=system, messages=messages)
+    try:
+        return client.messages.create(
+            thinking={"type": "adaptive"},
+            output_config={"effort": "high"},
+            **base,
+        )
+    except TypeError:
+        # 구버전 SDK: thinking/output_config 미지원 → 일반 호출
+        return client.messages.create(**base)
 
 
 class ContentAgentError(Exception):
@@ -162,18 +174,22 @@ def _normalize(data):
     }
 
 
-def section_body(section):
-    """섹션의 조사 필요 질문(Key Question)들을 슬라이드 본문(불릿 줄바꿈)으로 합친다."""
-    return "\n".join("• " + it["question"] for it in section.get("items", []) if it.get("question"))
-
-
 def to_build_spec(head_message, middle_title, slide_content):
     """콘텐츠 결과(또는 사용자 수정본)를 pptx_engine.build_deck 의 spec 으로 변환.
-    본문(body)에는 각 섹션 가설(hypothesis)들이 불릿으로 합쳐져 들어간다."""
-    secs = slide_content["sections"]
-    return {
-        "head": head_message,
-        "subtitle": middle_title,
-        "subs": [s.get("subtitle", "") for s in secs],
-        "bodies": [section_body(s) for s in secs],
-    }
+    칸(섹션)마다 질문→KQ, 가설→Hypothesis, 도식유형+메모→Structure 로 매핑한다."""
+    sections = []
+    for sec in slide_content["sections"]:
+        items = sec.get("items", [])
+        kq = "\n".join("• " + it["question"] for it in items if it.get("question"))
+        hyp = "\n".join("• " + it["hypothesis"] for it in items if it.get("hypothesis"))
+        struct = (sec.get("viz_type") or "").strip()
+        note = (sec.get("viz_note") or "").strip()
+        if note:
+            struct = (struct + " — " + note).strip(" —")
+        sections.append({
+            "sub": sec.get("subtitle", ""),
+            "kq": kq,
+            "hyp": hyp,
+            "struct": struct,
+        })
+    return {"head": head_message, "subtitle": middle_title, "sections": sections}
