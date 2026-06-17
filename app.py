@@ -11,6 +11,7 @@ Mock-deck Generator — Streamlit 앱
 
 import os
 import json
+import datetime
 import html as _html
 import streamlit as st
 import streamlit.components.v1 as components
@@ -37,6 +38,11 @@ st.markdown("""<style>
 .stDownloadButton button p, .stDownloadButton button div {
     font-size: 1.15rem !important;
     font-weight: 800 !important;
+}
+/* 셀렉트박스(추천 조사 방법·도식 유형)의 선택된 값도 크게+볼드 */
+.stSelectbox div[data-baseweb="select"] div {
+    font-size: 1.05rem !important;
+    font-weight: 700 !important;
 }
 </style>""", unsafe_allow_html=True)
 
@@ -224,6 +230,7 @@ def init_state():
     st.session_state._init = True
     st.session_state._next_id = 0
     st.session_state.topic = ""
+    st.session_state.context = ""
     st.session_state.slides = [_new_slide() for _ in range(3)]
     st.session_state.built_path = None
     st.session_state.qa = None
@@ -265,8 +272,11 @@ st.title("📊 Mock-deck Generator")
 # ==========================================================================
 st.header("1단계: Head Message 초안 작성하기")
 st.session_state.topic = st.text_input(
-    "프로젝트 주제 (전체 1회)", value=st.session_state.topic,
+    "프로젝트 주제", value=st.session_state.topic,
     placeholder="예: A사·B사 합병 후 영업조직 통합(PMI) 전략 수립")
+st.session_state.context = st.text_area(
+    "프로젝트 Context (Optional)", value=st.session_state.get("context", ""),
+    placeholder="프로젝트 배경·맥락을 적으면 2단계 생성에 반영됩니다. (비워도 됩니다)", height=90)
 
 st.markdown("**장표별 헤드메시지 + 중제목**")
 remove_id = None
@@ -306,6 +316,7 @@ if cgen.button("🤖 본문 작성 방향 잡기", type="primary"):
             try:
                 slide["content"] = CA.generate_slide_content(
                     st.session_state.topic, slide["head"], slide["middle"],
+                    project_context=st.session_state.get("context", ""),
                     api_key=st.session_state.api_key, model=st.session_state.model)
                 slide["confirmed"] = False
             except Exception as e:
@@ -343,7 +354,7 @@ if generated:
                     sec["subtitle"] = st.text_input("소제목", value=sec["subtitle"],
                                                     key="sub_%d_%d" % (sid, j), label_visibility="collapsed")
 
-                    st.markdown("**1. Requirements · 조사 필요 질문 → 2. Hypothesis**")
+                    st.markdown("<p style='font-size:1.18rem;font-weight:800;margin:8px 0 2px'>1. Key Question 및 초기 가설 도출</p>", unsafe_allow_html=True)
                     remove_item = None
                     for k, item in enumerate(sec["items"]):
                         with st.container(border=True):
@@ -369,7 +380,7 @@ if generated:
                         sec["items"].append({"question": "", "method": CA.DEFAULT_METHOD, "hypothesis": ""})
                         st.rerun()
 
-                    st.markdown("**3. 구조화 방향 제안**")
+                    st.markdown("<p style='font-size:1.18rem;font-weight:800;margin:8px 0 2px'>2. 구조화 방향 제안</p>", unsafe_allow_html=True)
                     sec["viz_type"] = st.selectbox("도식 유형", CA.VIZ_TYPES,
                                                    index=_idx(CA.VIZ_TYPES, sec.get("viz_type")),
                                                    key="vt_%d_%d" % (sid, j), label_visibility="collapsed")
@@ -378,25 +389,8 @@ if generated:
                                                    key="vn_%d_%d" % (sid, j), height=90,
                                                    placeholder="어떻게 구조화할지 (강조·화살표·배치 등)")
 
-            # 피드백 / 컨펌
-            fb = st.text_input("✏️ 피드백 (마음에 안 들면 입력 후 재생성)", key="fb_%d" % sid,
-                               placeholder="예: 우측을 시사점이 아니라 실행과제로 바꿔줘")
-            b1, b2 = st.columns(2)
-            if b1.button("🔄 피드백 반영 재생성", key="regen_%d" % sid):
-                if not st.session_state.api_key:
-                    st.error("API Key가 필요합니다.")
-                else:
-                    with st.spinner("재생성 중..."):
-                        try:
-                            slide["content"] = CA.generate_slide_content(
-                                st.session_state.topic, slide["head"], slide["middle"],
-                                api_key=st.session_state.api_key, model=st.session_state.model,
-                                feedback=fb or "구조와 내용을 더 명확하게 개선해줘", prior=content)
-                            slide["confirmed"] = False
-                        except Exception as e:
-                            st.error("재생성 실패: %s" % e)
-                    st.rerun()
-            if b2.button(("✅ 이 장표 컨펌" if not slide["confirmed"] else "↩️ 컨펌 해제"),
+            # 컨펌
+            if st.button(("✅ 이 장표 컨펌" if not slide["confirmed"] else "↩️ 컨펌 해제"),
                          key="cfm_%d" % sid, type="primary" if not slide["confirmed"] else "secondary"):
                 slide["confirmed"] = not slide["confirmed"]
                 st.rerun()
@@ -436,8 +430,9 @@ if generated:
             for w in qa["warnings"]:
                 st.markdown("- " + w)
 
+        _fname = "Mock-deck 초안_%s.pptx" % datetime.datetime.now().strftime("%y%m%d")
         with open(st.session_state.built_path, "rb") as f:
-            st.download_button("⬇️ output.pptx 다운로드", f, file_name="mockdeck.pptx",
+            st.download_button("⬇️ PPT 다운로드 (%s)" % _fname, f, file_name=_fname,
                                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
 
         with st.expander("📧 팀원에게 이메일로 보내기"):

@@ -58,6 +58,7 @@ def generate_slide_content(
     project_topic,
     head_message,
     middle_title,
+    project_context="",
     api_key=None,
     model=DEFAULT_MODEL,
     feedback=None,
@@ -77,6 +78,8 @@ def generate_slide_content(
         "프로젝트 주제: %s\n헤드메시지: %s\n중제목: %s"
         % (project_topic, head_message, middle_title)
     )
+    if project_context and project_context.strip():
+        user_msg += "\n프로젝트 Context(참고 맥락): %s" % project_context.strip()
     if feedback and prior:
         user_msg += (
             "\n\n# 이전 제안\n%s\n\n# 사용자 피드백(이에 맞춰 다시 제안하라)\n%s"
@@ -180,12 +183,14 @@ def to_build_spec(head_message, middle_title, slide_content):
     sections = []
     for sec in slide_content["sections"]:
         items = sec.get("items", [])
-        kq = "\n".join("• " + it["question"] for it in items if it.get("question"))
-        hyp = "\n".join("• " + it["hypothesis"] for it in items if it.get("hypothesis"))
+        # PPT 출력 시 각 줄 맨 앞에 라벨을 단다
+        kq = "\n".join("[KQ] " + it["question"] for it in items if it.get("question"))
+        hyp = "\n".join("[가설] " + it["hypothesis"] for it in items if it.get("hypothesis"))
         struct = (sec.get("viz_type") or "").strip()
         note = (sec.get("viz_note") or "").strip()
         if note:
             struct = (struct + " — " + note).strip(" —")
+        struct = "[구조화 방향 제안] " + struct if struct else ""
         sections.append({
             "sub": sec.get("subtitle", ""),
             "kq": kq,
