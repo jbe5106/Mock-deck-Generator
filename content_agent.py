@@ -169,6 +169,14 @@ def _normalize(data):
             "viz_type": vt,
             "viz_note": (sec.get("viz_note") or "").strip(),
         })
+    # 한 장표에 그래프(막대/도넛/워터폴)는 하나만 — 2개째부터 비-그래프로 강등(백스톱)
+    _seen_graph = False
+    for sec in norm:
+        if sec["viz_type"] in ("막대 차트", "도넛/파이", "워터폴"):
+            if _seen_graph:
+                sec["viz_type"] = "비교표"
+            else:
+                _seen_graph = True
     return {
         "n_sub": n,
         "split": SPLIT_BY_N[n],
